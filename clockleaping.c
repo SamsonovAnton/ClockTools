@@ -524,7 +524,8 @@ void Record(uint nSeconds) {
 } // end function Record
 
 
-int main(int argc, char **argv) {
+int main(int argc, const char** argv) {
+	(void)argc, (void)argv;
 
 	const uint nSecondsProlog = 5;
 	const uint nSecondsTotal = 2 * nSecondsProlog;

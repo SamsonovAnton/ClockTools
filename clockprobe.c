@@ -4,7 +4,7 @@
 #include <stdio.h>
 
 
-void ProbeClocks() {
+void ProbeClocks(void) {
 	clockid_t idClock;
 	printf("Supported clock ids: ");
 	for (idClock = 0; idClock <= 254; ++idClock) {
@@ -19,7 +19,8 @@ void ProbeClocks() {
 } // end function ProbeClocks
 
 
-int main(int argc, char **argv) {
+int main(int argc, const char** argv) {
+	(void)argc, (void)argv;
 	ProbeClocks();
 	return 0;
 } // end function main

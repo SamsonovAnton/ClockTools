@@ -14,6 +14,27 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+
+#ifndef SIZE_C
+	#define SIZE_C(c) (size_t)(c ## u)
+#endif
+
+#ifndef PRIuZ
+	#if defined(__GNUC__) || defined(__clang__)
+		#define PRIuZ "zu"
+		#define PRIxZ "zx"
+		#define PRIXZ "zX"
+	#elif defined(_MSC_VER) && (!defined __INTEL_COMPILER)
+		#define PRIuZ "Iu"
+		#define PRIxZ "Ix"
+		#define PRIXZ "IX"
+	#else
+		#define PRIuZ "u"
+		#define PRIxZ "x"
+		#define PRIXZ "X"
+	#endif
+#endif
+
 typedef uint32_t nanoseconds_t;
 #define NANOSECONDS_C(x) UINT32_C(x)
 #define NANOSECONDS_MAX UINT32_MAX
@@ -270,14 +291,14 @@ void print_clock_precision(
 void print_benchmark_banner(
 	const struct clock_benchmark_conf* benchmark_conf
 ) {
-	printf("\nBenchmarking in %zu batches of %zu measurements each,\n"
-		"which gives %zu sampling opportunities in total.\n",
+	printf("\nBenchmarking in %" PRIuZ " batches of %" PRIuZ " measurements each,\n"
+		"which gives %" PRIuZ " sampling opportunities in total.\n",
 		benchmark_conf->batch_count, benchmark_conf->trial_count,
 		benchmark_conf->batch_count * benchmark_conf->trial_count);
 	printf("Pausing for up to %" PRIuMICROSECONDS
 		" microseconds before each batch.\n",
 		benchmark_conf->pause);
-	printf("Selection margin is %zu %% of best and worst samples.\n\n",
+	printf("Selection margin is %" PRIuZ " %% of best and worst samples.\n\n",
 		benchmark_conf->sel_margin);
 } // end function print_benchmark_banner
 
@@ -340,11 +361,13 @@ nanoseconds_t measure_clock_gettime(const void* engine_args) {
 #ifdef ENGINE_GETTIMEOFDAY
 
 nanoseconds_t query_gettimeofday(const void* engine_args) {
+	(void)engine_args;
 	return MICROSECONDS_TO_NANOSECONDS;
 } // end function query_gettimeofday
 
 nanoseconds_t measure_gettimeofday(const void* engine_args) {
 	struct timeval tv_start, tv_stop;
+	(void)engine_args;
 	gettimeofday(&tv_start, NULL);
 	gettimeofday(&tv_stop, NULL);
 	if (tv_stop.tv_sec != tv_start.tv_sec) return 0;
@@ -359,12 +382,15 @@ nanoseconds_t measure_gettimeofday(const void* engine_args) {
 #ifdef ENGINE_CLOCK_CPUTIME
 
 nanoseconds_t query_clock(const void* engine_args) {
+	(void)engine_args;
 	return SECONDS_TO_NANOSECONDS / CLOCKS_PER_SEC;
 } // end function query_clock
 
 nanoseconds_t measure_clock(const void* engine_args) {
-	clock_t c_start = clock();
-	clock_t c_stop = clock();
+	clock_t c_start, c_stop;
+	(void)engine_args;
+	c_start = clock();
+	c_stop = clock();
 	if (c_stop <= c_start) return 0;
 	return ((nanoseconds_t)(c_stop - c_start))
 		* (SECONDS_TO_NANOSECONDS / CLOCKS_PER_SEC);
@@ -477,21 +503,21 @@ void release_clock_engines(
 } // end function release_clock_engines
 
 
-#define BATCH_COUNT_MIN UINT16_C(1)
-#define BATCH_COUNT_MAX UINT16_C(16384)
-#define BATCH_COUNT_DEF UINT16_C(512)
+#define BATCH_COUNT_MIN SIZE_C(1)
+#define BATCH_COUNT_MAX SIZE_C(16384)
+#define BATCH_COUNT_DEF SIZE_C(512)
 
-#define TRIAL_COUNT_MIN UINT16_C(8)
-#define TRIAL_COUNT_MAX UINT16_C(49152)
-#define TRIAL_COUNT_DEF UINT16_C(8192)
+#define TRIAL_COUNT_MIN SIZE_C(8)
+#define TRIAL_COUNT_MAX SIZE_C(49152)
+#define TRIAL_COUNT_DEF SIZE_C(8192)
 
 #define BATCH_PAUSE_MIN MICROSECONDS_C(0)
 #define BATCH_PAUSE_MAX MICROSECONDS_C(50000)
 #define BATCH_PAUSE_DEF MICROSECONDS_C(7500)
 
-#define SELECTION_MARGIN_MIN UINT8_C(1)	// Ignored worst and best, per cent.
-#define SELECTION_MARGIN_MAX UINT8_C(25)
-#define SELECTION_MARGIN_DEF UINT8_C(5)
+#define SELECTION_MARGIN_MIN SIZE_C(1)	// Ignored worst and best, per cent.
+#define SELECTION_MARGIN_MAX SIZE_C(25)
+#define SELECTION_MARGIN_DEF SIZE_C(5)
 
 void print_help(const char* self_path) {
 	if (self_path && strlen(self_path)) {
@@ -509,18 +535,22 @@ void print_help(const char* self_path) {
 	printf("-e, --engine {index}\n"
 		"\tBenchmark particular clock engine specified by its index.\n"
 		"\tRun with -l or --list to view all available engines.\n\n");
-	printf("-b, --batches {count} \t| range: %zu to %zu, default: %zu\n"
+	printf("-b, --batches {count}"
+		"\t| range: %" PRIuZ " to %" PRIuZ ", default: %" PRIuZ "\n"
 		"\tSet number of batches for benchmarking.\n\n",
 		BATCH_COUNT_MIN, BATCH_COUNT_MAX, BATCH_COUNT_DEF);
-	printf("-t, --trials {count} \t| range: %zu to %zu, default: %zu\n"
+	printf("-t, --trials {count}"
+		"\t| range: %" PRIuZ " to %" PRIuZ ", default: %" PRIuZ "\n"
 		"\tSet number of trials in each benchmarking batch.\n\n",
 		TRIAL_COUNT_MIN, TRIAL_COUNT_MAX, TRIAL_COUNT_DEF);
-	printf("-p, --pause {duration} \t| range: %" PRIuMICROSECONDS
-		" to %" PRIuMICROSECONDS ", default: %" PRIuMICROSECONDS "\n"
+	printf("-p, --pause {duration}"
+		"\t| range: %" PRIuMICROSECONDS " to %" PRIuMICROSECONDS
+		", default: %" PRIuMICROSECONDS "\n"
 		"\tSet maximum sleep time before each batch, in microseconds.\n"
 		"\tActual duration will be randomized on every ocassion.\n\n",
 		BATCH_PAUSE_MIN, BATCH_PAUSE_MAX, BATCH_PAUSE_DEF);
-	printf("-m, --margin {portion} \t| range: %zu to %zu, default: %zu\n"
+	printf("-m, --margin {portion}"
+		"\t| range: %" PRIuZ " to %" PRIuZ ", default: %" PRIuZ "\n"
 		"\tSet selection margin for statistical analysis, per cent.\n"
 		"\tBoth best and worst samples of that amount will be excluded.\n\n",
 		SELECTION_MARGIN_MIN, SELECTION_MARGIN_MAX, SELECTION_MARGIN_DEF);
@@ -538,7 +568,7 @@ void print_clock_engines(
 	printf("Available clock engines:\n");
 	size_t index;
 	for (index = 0; index < engine_count; ++index) {
-		printf("%2d. %s\n", (index + 1), (engines + index)->name);
+		printf("%2d. %s\n", (int)(index + 1), (engines + index)->name);
 	} // end for
 	printf("\n");
 } // end function benchmark_all_clocks
@@ -589,7 +619,8 @@ int main(int argc, char **argv) {
 	size_t engine_index;
 
 	size_t argi = 1;
-	while (argi < argc) {
+	size_t argn = argc;
+	while (argi < argn) {
 		const char* argt = argv[argi++];
 		if ((strcmp(argt, "-?") == 0)
 				|| (strcmp(argt, "--help") == 0)) {
@@ -608,12 +639,12 @@ int main(int argc, char **argv) {
 			work_mode = work_mode_benchmark_all_clocks;
 		} else if ((strcmp(argt, "-e") == 0)
 				|| (strcmp(argt, "--engine") == 0)) {
-			if (argi >= argc) {
+			if (argi >= argn) {
 				work_mode = work_mode_syntax_error;
 				error_message = "No engine index specified.";
 				break;
 			} // end if
-			if (sscanf(argv[argi++], "%zu", &engine_index) <= 0) {
+			if (sscanf(argv[argi++], "%" PRIuZ, &engine_index) <= 0) {
 				work_mode = work_mode_syntax_error;
 				error_message = "Malformed engine index specified.";
 				break;
@@ -627,12 +658,12 @@ int main(int argc, char **argv) {
 			--engine_index;
 		} else if ((strcmp(argt, "-b") == 0)
 				|| (strcmp(argt, "--batches") == 0)) {
-			if (argi >= argc) {
+			if (argi >= argn) {
 				work_mode = work_mode_syntax_error;
 				error_message = "No batch count specified.";
 				break;
 			} // end if
-			if (sscanf(argv[argi++], "%zu", &benchmark_conf.batch_count) <= 0) {
+			if (sscanf(argv[argi++], "%" PRIuZ, &benchmark_conf.batch_count) <= 0) {
 				work_mode = work_mode_syntax_error;
 				error_message = "Malformed batch count specified.";
 				break;
@@ -645,12 +676,12 @@ int main(int argc, char **argv) {
 			} // end if
 		} else if ((strcmp(argt, "-t") == 0)
 				|| (strcmp(argt, "--trials") == 0)) {
-			if (argi >= argc) {
+			if (argi >= argn) {
 				work_mode = work_mode_syntax_error;
 				error_message = "No trial count specified.";
 				break;
 			} // end if
-			if (sscanf(argv[argi++], "%zu", &benchmark_conf.trial_count) <= 0) {
+			if (sscanf(argv[argi++], "%" PRIuZ, &benchmark_conf.trial_count) <= 0) {
 				work_mode = work_mode_syntax_error;
 				error_message = "Malformed trial count specified.";
 				break;
@@ -663,7 +694,7 @@ int main(int argc, char **argv) {
 			} // end if
 		} else if ((strcmp(argt, "-p") == 0)
 				|| (strcmp(argt, "--pause") == 0)) {
-			if (argi >= argc) {
+			if (argi >= argn) {
 				work_mode = work_mode_syntax_error;
 				error_message = "No pause duration specified.";
 				break;
@@ -674,20 +705,24 @@ int main(int argc, char **argv) {
 				error_message = "Malformed pause duration specified.";
 				break;
 			} // end if
-			if ((benchmark_conf.pause < BATCH_PAUSE_MIN)
-					|| (benchmark_conf.pause > BATCH_PAUSE_MAX)) {
+			if (
+#if BATCH_PAUSE_MIN > 0
+				(benchmark_conf.pause < BATCH_PAUSE_MIN) ||
+#endif
+				(benchmark_conf.pause > BATCH_PAUSE_MAX)
+			) {
 				work_mode = work_mode_config_error;
 				error_message = "Specified pause duration is out of range.";
 				break;
 			} // end if
 		} else if ((strcmp(argt, "-m") == 0)
 				|| (strcmp(argt, "--margin") == 0)) {
-			if (argi >= argc) {
+			if (argi >= argn) {
 				work_mode = work_mode_syntax_error;
 				error_message = "No selection margin specified.";
 				break;
 			} // end if
-			if (sscanf(argv[argi++], "%zu", &benchmark_conf.sel_margin) <= 0) {
+			if (sscanf(argv[argi++], "%" PRIuZ, &benchmark_conf.sel_margin) <= 0) {
 				work_mode = work_mode_syntax_error;
 				error_message = "Malformed selection margin specified.";
 				break;
@@ -715,6 +750,8 @@ int main(int argc, char **argv) {
 				error_message = "Failed to allocate memory for samples.";
 			} // end if
 			break;
+		default:
+			break;
 	} // end switch
 
 	switch (work_mode) {
@@ -731,7 +768,7 @@ int main(int argc, char **argv) {
 			fprintf(stderr, "\n");
 			break;
 		case work_mode_help:
-			print_help(argc ? argv[0] : NULL);
+			print_help(argn ? argv[0] : NULL);
 			break;
 		case work_mode_version:
 			print_version();
@@ -744,6 +781,9 @@ int main(int argc, char **argv) {
 			break;
 		case work_mode_benchmark_single_clock:
 			benchmark_single_clock(engines + engine_index, &benchmark_conf);
+			break;
+		case work_mode_benchmark_interactive:
+			// TODO.
 			break;
 	} // end switch
 
